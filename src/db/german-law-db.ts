@@ -428,6 +428,58 @@ export function getGermanDocumentByAnyId(
   return null;
 }
 
+export function getGermanLawProvision(
+  law: string,
+  article: string,
+): LawDocument | null | undefined {
+  const db = getDb();
+  if (!db || !tableExists(db, "law_documents")) {
+    return undefined;
+  }
+
+  const statuteId = law.trim().toLowerCase();
+  const articleRaw = article.trim();
+  if (!statuteId || !articleRaw) {
+    return null;
+  }
+
+  // Customers may submit the article as a bare number ("812"), with
+  // German prefix ("§ 812", "Art. 1", "Artikel 1"), or already prefixed.
+  // The ingest stores section_ref with the prefix as it appears in the
+  // gesetze-im-internet XML (typically "§ N" for paragraph statutes,
+  // "Art. N" for constitutional articles). Try the bare/prefixed variants
+  // in order and return the first match.
+  const stripped = articleRaw.replace(/^(?:§{1,2}|Art\.?|Artikel)\s*/i, "").trim();
+  const sectionRefCandidates = dedupeStrings([
+    articleRaw,
+    `§ ${stripped}`,
+    `Art. ${stripped}`,
+    `Artikel ${stripped}`,
+    stripped,
+  ]).filter((value) => value.length > 0);
+
+  try {
+    const stmt = db.prepare(
+      `
+      SELECT id, country, kind, title, citation, source_url, effective_date, text_snippet, metadata_json
+      FROM law_documents
+      WHERE lower(statute_id) = ? AND section_ref = ?
+      LIMIT 1
+      `,
+    );
+    for (const candidate of sectionRefCandidates) {
+      const row = stmt.get(statuteId, candidate) as StatuteRow | undefined;
+      if (row) {
+        return mapStatuteRowToLawDocument(row);
+      }
+    }
+    return null;
+  } catch (err) {
+    console.error("[german-law-mcp] DB query error:", err instanceof Error ? err.message : err);
+    return undefined;
+  }
+}
+
 export function getGermanLawDocumentsByStatuteId(
   statuteId: string,
   limit = 200,

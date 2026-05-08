@@ -8,6 +8,7 @@ import {
   getGermanLawDocumentsByCitation,
   getGermanLawDocumentsByStatuteId,
   getGermanLawDocumentById,
+  getGermanLawProvision,
   getGermanLawDocumentCount,
   getGermanPreparatoryWorkCount,
   resolveGermanLawDatabasePath,
@@ -105,6 +106,13 @@ export const germanyAdapter: CountryAdapter = {
       return dbDocument;
     }
     return getDocumentFromMemory(GERMAN_LEGISLATION, id);
+  },
+  async getProvision(law, article) {
+    const dbDocument = getGermanLawProvision(law, article);
+    if (dbDocument !== undefined && dbDocument !== null) {
+      return dbDocument;
+    }
+    return null;
   },
   async parseCitation(citation: string) {
     const parsed = parseGermanCitation(citation);

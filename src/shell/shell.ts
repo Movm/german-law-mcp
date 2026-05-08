@@ -144,7 +144,20 @@ export class LawMcpShell {
 
   private async getDocument(args: Record<string, unknown>): Promise<unknown> {
     const adapter = this.requireDocumentsAdapter();
-    const id = requireString(args, "id");
+    const law = optionalString(args, "law");
+    const article = optionalString(args, "article");
+    const id = optionalString(args, "id");
+
+    if (law && article && adapter.getProvision) {
+      return adapter.getProvision(law, article);
+    }
+
+    if (!id) {
+      throw new ShellError(
+        "invalid_arguments",
+        "Expected either {law, article} or {id}",
+      );
+    }
 
     return adapter.getDocument!(id);
   }

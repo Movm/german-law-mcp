@@ -359,20 +359,35 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: "get_provision",
     description:
-      "Retrieve a single document by its ID. " +
-      "Use this to get the full text/details of a specific statute, case, or preparatory work " +
-      "found via search_legislation, search_case_law, or get_preparatory_works. " +
-      "The ID is returned in the 'id' field of search results. " +
-      "Searches across all document tables (statutes, case law, preparatory works).",
+      "Retrieve the full text of a specific statute provision. " +
+      "Two argument shapes are supported: " +
+      "(a) `{law, article}` — the canonical gateway shape, e.g. `{law: 'BGB', article: '812'}`; " +
+      "(b) `{id}` — the document id returned by search results, e.g. `{id: 'bgb:812'}`. " +
+      "When both `law` and `article` are supplied they take precedence over `id`. " +
+      "Falls back to a search across statutes, case law, and preparatory works when only `id` is given.",
     inputSchema: {
       type: "object",
-      additionalProperties: false,
-      required: ["id"],
+      required: [],
       properties: {
         id: {
           type: "string",
           description:
-            "Document ID from a previous search result. Examples: 'gg-art-1', 'bgb-433'.",
+            "Document id from a previous search result. Example: 'bgb:812'.",
+        },
+        law: {
+          type: "string",
+          description:
+            "Statute identifier (e.g. 'BGB', 'GG', 'BDSG'). Used together with `article`. Case-insensitive.",
+        },
+        article: {
+          type: "string",
+          description:
+            "Section/article number within the statute (e.g. '812', '1', '433'). Used together with `law`.",
+        },
+        country: {
+          type: "string",
+          description:
+            "Two-letter country code. Optional; the gateway injects 'DE' for this MCP.",
         },
       },
     },
