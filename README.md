@@ -317,7 +317,7 @@ npm test
 
 ```bash
 npm run dev                                       # Start MCP server
-npx @anthropic/mcp-inspector node dist/src/index.js   # Test with MCP Inspector
+npx @anthropic/mcp-inspector node dist/index.js   # Test with MCP Inspector
 ```
 
 ### Data Management

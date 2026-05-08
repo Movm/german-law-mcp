@@ -4,9 +4,9 @@
   "mcpName": "eu.ansvar/german-law-mcp",
   "description": "German legal research MCP server with statutes, case law, and preparatory works from gesetze-im-internet.de",
   "type": "module",
-  "main": "dist/src/index.js",
+  "main": "dist/index.js",
   "bin": {
-    "german-law-mcp": "dist/src/index.js"
+    "german-law-mcp": "dist/index.js"
   },
   "files": [
     "dist",
@@ -40,8 +40,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "tsx src/index.ts",
-    "start": "node dist/src/index.js",
-    "scaffold:country": "npm run build && node dist/scripts/scaffold-country.js",
+    "start": "node dist/index.js",
+    "scaffold:country": "tsx scripts/scaffold-country.ts",
     "ingest": "python3 scripts/ingest_gesetze_im_internet.py",
     "ingest:dry-run": "python3 scripts/ingest_gesetze_im_internet.py --dry-run",
     "ingest:missing": "python3 scripts/ingest_gesetze_im_internet.py --only-missing",
@@ -59,16 +59,15 @@
     "write:metadata": "tsx scripts/write-db-metadata.ts",
     "build:db:free": "tsx scripts/build-db-free.ts",
     "build:db:paid": "tsx scripts/build-db-paid.ts",
-    "test": "npm run build && node --test dist/test/*.test.js",
-    "test:contract": "npm run build && node --test dist/__tests__/contract/*.test.js",
+    "test": "tsx --test test/*.test.ts",
+    "test:contract": "tsx --test __tests__/contract/*.test.ts",
     "drift:detect": "tsx scripts/drift-detect.ts",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
     "validate": "npm run typecheck && npm test && npm run test:contract",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit -p tsconfig.test.json"
   },
   "devDependencies": {
     "@types/node": "^22.13.4",
-    "@vercel/node": "^5.6.3",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3"
   },

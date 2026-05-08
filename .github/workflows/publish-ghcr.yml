@@ -1,34 +1,40 @@
 # =============================================================================
-# MCP GHCR Build — Build Docker image and push to GitHub Container Registry
+# Publish GHCR Image — Build, push, and scan container image
 # =============================================================================
 #
-# Triggered on push to main or dev, and on manual dispatch.
-# - main: pushes :latest and :sha-XXXXXXX tags
-# - dev:  pushes :dev and :sha-XXXXXXX tags
+# Triggered on push to main when source, data, or Dockerfile changes.
+# Builds and pushes to GHCR, then runs Trivy image scan (post-merge audit).
 #
-# Watchtower on the Hetzner prod server polls GHCR every 6 hours and
-# automatically restarts containers when a new :latest image is detected.
-# No manual deploy step needed.
+# GHCR auth uses GitHub's built-in GITHUB_TOKEN — no additional secrets needed.
 #
-# DATABASE PROVISIONING:
-# If the Dockerfile COPYs a .db file and that file is missing, empty, or an
-# LFS pointer after checkout, this workflow downloads database.db.gz from the
-# repo's latest GitHub Release. This handles two failure modes:
-#   1. Repos using Git LFS where the runner lacks LFS (fallback to release)
-#   2. Repos with data/*.db in .gitignore (placeholder only, real DB in release)
-#
-# PREREQUISITES:
-# 1. Repository must have a Dockerfile at the root (or specify path)
-# 2. GITHUB_TOKEN has automatic write:packages permission (no secrets needed)
-# 3. For repos with gitignored/LFS databases: a GitHub Release with database.db.gz
+# Trivy scans the just-built image for CRITICAL and HIGH CVEs.
+# Results are uploaded to the GitHub Security tab as SARIF.
+# This is a post-merge audit trail, not a merge gate (see spec §5.1.1).
 #
 # =============================================================================
 
-name: Build and Push to GHCR
-
+name: Publish GHCR Image
 on:
   push:
     branches: [main, dev]
+    paths:
+      - 'src/**'
+      - 'data/**'
+      - 'scripts/**'
+      - 'sources.yml'
+      - 'server.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.json'
+      - 'Dockerfile'
+      - '.dockerignore'
+      # Include this workflow's own path so the PR that adds or modifies it
+      # rebuilds :latest on its merge commit. Without this, a PR that only
+      # touches .github/workflows/ (e.g. introducing this file) is excluded
+      # by its own filter — the workflow exists on main but never runs, and
+      # a separate "trigger" PR (e.g. a package.json bump) is needed to
+      # actually publish. See public-procurement-mcp PR #13 for the incident.
+      - '.github/workflows/publish-ghcr.yml'
   workflow_dispatch:
 
 concurrency:
@@ -37,29 +43,34 @@ concurrency:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: german-law-mcp
-
-permissions:
-  contents: read
-  packages: write
 
 jobs:
   build-and-push:
-    name: Build and Push
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+      actions: read  # codeql-action/upload-sarif requires this on internal/private repos
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           lfs: true
+
+      - name: Set image name from package.json
+        id: meta
+        run: |
+          NAME=$(node -e "console.log(require('./package.json').name.replace('@ansvar/', ''))")
+          VERSION=$(node -e "console.log(require('./package.json').version)")
+          echo "image_name=${NAME}" >> $GITHUB_OUTPUT
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
       - name: Provision database
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Check if Dockerfile copies any .db file
-          DB_FILES=$(grep -oP 'COPY\s+\K(data/\S+\.db)' Dockerfile 2>/dev/null || true)
+          DB_FILES=$(grep -oP 'COPY[^#]*\K(data/\S+\.db)\b' Dockerfile 2>/dev/null || true)
           if [ -z "$DB_FILES" ]; then
             echo "No .db files in Dockerfile COPY, skipping"
             exit 0
@@ -71,7 +82,6 @@ jobs:
               continue
             fi
 
-            # Detect LFS pointer or empty file
             if [ -f "$DB_FILE" ]; then
               if head -1 "$DB_FILE" 2>/dev/null | grep -q 'version https://git-lfs'; then
                 echo "WARN: $DB_FILE is an LFS pointer, not actual data"
@@ -82,7 +92,6 @@ jobs:
               echo "WARN: $DB_FILE does not exist"
             fi
 
-            # Download from GitHub Releases
             TAG=$(gh release view --json tagName -q '.tagName' 2>/dev/null) || true
             if [ -z "$TAG" ]; then
               echo "ERROR: $DB_FILE invalid and no GitHub Release available"
@@ -91,13 +100,11 @@ jobs:
 
             echo "Downloading *.db.gz from release $TAG..."
             mkdir -p data
-            # Match any .db.gz asset; some MCPs publish database.db.gz, others publish <name>-free.db.gz
             if gh release download "$TAG" -p "*.db.gz" -D data/ 2>/dev/null; then
               for gz in data/*.db.gz; do
                 [ -e "$gz" ] || continue
                 gunzip -f "$gz"
               done
-              # Normalize to data/database.db so the Dockerfile COPY succeeds regardless of asset naming
               if [ ! -f data/database.db ]; then
                 first_db=$(ls data/*.db 2>/dev/null | head -1)
                 [ -n "$first_db" ] && mv "$first_db" data/database.db
@@ -115,47 +122,44 @@ jobs:
           done
 
       - name: Set up Docker Buildx
+        # Required for `cache-to: type=gha` — the default `docker` driver
+        # does not support cache export. Use the docker-container driver via
+        # buildx so the GitHub Actions cache backend works.
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to GHCR
+      - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
+          registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/ansvar-systems/${{ env.IMAGE_NAME }}
-          tags: |
-            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'main') }}
-            type=raw,value=dev,enable=${{ github.ref == 'refs/heads/dev' }}
-            type=sha,prefix=sha-,format=short
-
-      - name: Build and push
-        uses: docker/build-push-action@v5
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64
+          tags: |
+            ${{ env.REGISTRY }}/ansvar-systems/${{ steps.meta.outputs.image_name }}:${{ github.ref == 'refs/heads/main' && 'latest' || 'dev' }}
+            ${{ env.REGISTRY }}/ansvar-systems/${{ steps.meta.outputs.image_name }}:sha-${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Summary
+      - name: Trivy image scan
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1  # v0.35.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/ansvar-systems/${{ steps.meta.outputs.image_name }}:sha-${{ github.sha }}
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+
+      - name: Upload Trivy results to Security tab
+        uses: github/codeql-action/upload-sarif@v3
         if: always()
-        run: |
-          echo "## GHCR Build" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Field | Value |" >> "$GITHUB_STEP_SUMMARY"
-          echo "|-------|-------|" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Image | \`${{ env.REGISTRY }}/ansvar-systems/${{ env.IMAGE_NAME }}\` |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Tags | $(echo '${{ steps.meta.outputs.tags }}' | tr '\n' ', ') |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Branch | \`${{ github.ref_name }}\` |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Commit | \`${{ github.sha }}\` |" >> "$GITHUB_STEP_SUMMARY"
+        continue-on-error: true  # Code Security must be enabled on the repo for upload to succeed; non-fatal per workflow header (post-merge audit trail, not a merge gate)
+        with:
+          sarif_file: trivy-results.sarif
 
       - name: Trigger Watchtower update on prod
         if: success() && github.ref == 'refs/heads/main'
@@ -165,7 +169,6 @@ jobs:
         run: |
           if [ -z "$WATCHTOWER_TOKEN" ]; then
             echo "WATCHTOWER_HTTP_API_TOKEN not set — skipping kick. Prod will swap on next hourly Watchtower poll."
-            echo "To enable near-instant deploys, add this secret to the repo (value lives in /opt/ansvar/prod/mcp/watchtower/.env on the prod host)."
             exit 0
           fi
           echo "Kicking Watchtower /v1/update..."
@@ -179,5 +182,5 @@ jobs:
           if [ "$HTTP" = "200" ]; then
             echo "OK: Watchtower scan triggered — prod should swap container within seconds."
           else
-            echo "WARN: Watchtower kick returned HTTP $HTTP. Hourly poll will swap eventually."
+            echo "WARN: Watchtower kick returned HTTP $HTTP — falling back to hourly poll."
           fi
