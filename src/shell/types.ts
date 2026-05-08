@@ -308,6 +308,7 @@ export interface CountryAdapter {
     request: EuComplianceValidationRequest,
   ): Promise<EuComplianceValidationResult>;
   getDocument?(id: string): Promise<LawDocument | null>;
+  getProvision?(law: string, article: string): Promise<LawDocument | null>;
   parseCitation?(citation: string): Promise<CitationParseResult | null>;
   validateCitation?(citation: string): Promise<CitationValidationResult>;
   runIngestion?(request: IngestionRequest): Promise<IngestionResult>;

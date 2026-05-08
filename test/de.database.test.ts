@@ -141,6 +141,48 @@ test("de adapter uses sqlite-backed corpus when configured", async () => {
     JSON.stringify({ source: "fixture" }),
   );
 
+  // Fixture mirroring how the gateway addresses BGB §812: statute_id is
+  // lowercase, section_ref carries the "§ N" prefix as the ingest stores it.
+  db.prepare(`
+    INSERT INTO law_documents (
+      id, country, statute_id, section_ref, kind, title, citation, source_url, effective_date, text_snippet, metadata_json, updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+  `).run(
+    "bgb:812",
+    "de",
+    "bgb",
+    "§ 812",
+    "statute",
+    "Bürgerliches Gesetzbuch - Herausgabeanspruch",
+    "§ 812 BGB",
+    "https://www.gesetze-im-internet.de/bgb/__812.html",
+    "2002-01-02",
+    "Wer durch die Leistung eines anderen etwas ohne rechtlichen Grund erlangt …",
+    JSON.stringify({ source: "fixture" }),
+  );
+
+  // Fixture for an "Art." statute (Grundgesetz) so the prefix variants in
+  // getGermanLawProvision get exercised end-to-end.
+  db.prepare(`
+    INSERT INTO law_documents (
+      id, country, statute_id, section_ref, kind, title, citation, source_url, effective_date, text_snippet, metadata_json, updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+  `).run(
+    "gg:1",
+    "de",
+    "gg",
+    "Art. 1",
+    "statute",
+    "Grundgesetz - Menschenwürde",
+    "Art. 1 GG",
+    "https://www.gesetze-im-internet.de/gg/art_1.html",
+    "1949-05-23",
+    "Die Würde des Menschen ist unantastbar.",
+    JSON.stringify({ source: "fixture" }),
+  );
+
   db.prepare(`
     INSERT INTO case_law_documents (
       id, country, case_id, ecli, court, decision_date, file_number, decision_type, title, citation, source_url, text_snippet, metadata_json, updated_at
@@ -206,6 +248,40 @@ test("de adapter uses sqlite-backed corpus when configured", async () => {
 
     assert.equal(getResult.ok, true);
     assert.equal((getResult.data as { id: string }).id, "bdsg:1");
+
+    // Gateway shape: {law, article, country}. input_map renames `law` to
+    // `id` upstream of the MCP, so the shell receives both `id` and
+    // `article` together — the new code path resolves via statute_id +
+    // section_ref. Without the fix this returns null (Bug 1).
+    const provisionResult = await shell.handleToolCall({
+      name: "get_provision",
+      arguments: { id: "BGB", law: "BGB", article: "812", country: "DE" },
+    });
+    assert.equal(provisionResult.ok, true);
+    assert.equal((provisionResult.data as { id: string }).id, "bgb:812");
+
+    // "Art." statutes: section_ref="Art. 1", customer passes article="1".
+    const ggResult = await shell.handleToolCall({
+      name: "get_provision",
+      arguments: { law: "GG", article: "1", country: "DE" },
+    });
+    assert.equal(ggResult.ok, true);
+    assert.equal((ggResult.data as { id: string }).id, "gg:1");
+
+    // Customer pre-prefixes the article ("§ 812"). Strip-and-retry path.
+    const prefixedResult = await shell.handleToolCall({
+      name: "get_provision",
+      arguments: { law: "BGB", article: "§ 812" },
+    });
+    assert.equal(prefixedResult.ok, true);
+    assert.equal((prefixedResult.data as { id: string }).id, "bgb:812");
+
+    // Missing both shapes is a validation error.
+    const missingResult = await shell.handleToolCall({
+      name: "get_provision",
+      arguments: { country: "DE" },
+    });
+    assert.equal(missingResult.ok, false);
 
     const citationSearchResult = await shell.handleToolCall({
       name: "search_legislation",
