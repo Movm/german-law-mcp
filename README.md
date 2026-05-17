@@ -362,10 +362,10 @@ Apache License 2.0. See [LICENSE](./LICENSE) for details.
 
 ### Data Licenses
 
-- **Statutes & Regulations:** gesetze-im-internet.de (public domain, German federal government)
-- **Case Law:** rechtsprechung-im-internet.de (public domain)
-- **Preparatory Works:** DIP Bundestag (public domain)
-- **EU Metadata:** EUR-Lex (EU public domain)
+- **Statutes & Regulations:** `German-UrhG-Section-5` -- German statutory public domain. UrhG §5(1) "Amtliche Werke" excludes statutes, ordinances, official decrees and notices, decisions and officially drafted headnotes from copyright protection; §5(2) extends to other official works published in the official interest. Verified verbatim 2026-05-17 -- see [`docs/audits/2026-05-17-eu-copyright-statutory-works-batch-1b-DE-IE-IT-NL-ES.md`](https://github.com/Ansvar-Systems/Ansvar-Architecture-Documentation/blob/main/docs/audits/2026-05-17-eu-copyright-statutory-works-batch-1b-DE-IE-IT-NL-ES.md). Catalog entry: `German-UrhG-Section-5` in `infrastructure/attribution-licenses.json`.
+- **Case Law:** rechtsprechung-im-internet.de -- same statutory basis (UrhG §5(1) decisions clause)
+- **Preparatory Works:** DIP Bundestag -- UrhG §5(2) official-interest publications
+- **EU Metadata:** EUR-Lex (EU public domain, Decision 2011/833/EU)
 
 ---
 

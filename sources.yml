@@ -1,5 +1,12 @@
 # sources.yml — Data provenance metadata
 # Reference: docs/mcp-infrastructure-blueprint.md §3
+# License axis: German-UrhG-Section-5 (German statutory public domain)
+# Statutory basis: UrhG §5(1) "Amtliche Werke" — statutes, ordinances,
+# official decrees and notices, decisions and officially drafted headnotes
+# enjoy no copyright protection. §5(2) extends to other official works
+# published in the official interest. Verified verbatim 2026-05-17.
+# Cross-ref: docs/audits/2026-05-17-eu-copyright-statutory-works-batch-1b-DE-IE-IT-NL-ES.md
+# Catalog entry: infrastructure/attribution-licenses.json → "German-UrhG-Section-5"
 
 schema_version: "1.0"
 mcp_name: "German Law MCP"
@@ -15,9 +22,9 @@ sources:
     update_frequency: "daily"
     last_ingested: "2026-02-14"
     license_or_terms:
-      type: "Government Open Data"
-      url: "https://www.gesetze-im-internet.de/Teilliste_Bundesrecht.html"
-      summary: "German federal statutes published by the Federal Ministry of Justice, free to use"
+      type: "German-UrhG-Section-5"
+      url: "https://www.gesetze-im-internet.de/urhg/__5.html"
+      summary: 'German statutory public domain (UrhG §5(1) + §5(2) "Amtliche Werke"). Statutes, ordinances, official decrees and notices, decisions and officially drafted headnotes enjoy no copyright protection (§5(1)); §5(2) extends to other official works published in the official interest. Statute-level basis on the underlying text.'
     coverage:
       scope: "All consolidated German federal statutes (Bundesrecht)"
       limitations: "State (Landes) legislation not included; historical versions may be incomplete"
