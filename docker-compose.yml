@@ -1,0 +1,65 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-germanlaw}
+      POSTGRES_USER: ${POSTGRES_USER:-germanlaw}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-germanlaw} -d ${POSTGRES_DB:-germanlaw}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  ingest:
+    build:
+      context: .
+      dockerfile: pipeline/Dockerfile
+    command:
+      - pipeline.import_quantlaw
+      - --snapshot
+      - ${QUANTLAW_SNAPSHOT:?set QUANTLAW_SNAPSHOT to an available YYYY-MM-DD tag}
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-germanlaw}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-germanlaw}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  export:
+    build:
+      context: .
+      dockerfile: pipeline/Dockerfile
+    command: ["pipeline.export_sqlite", "--output", "/data/database.db"]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-germanlaw}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-germanlaw}
+    volumes:
+      - mcp-data:/data
+    depends_on:
+      ingest:
+        condition: service_completed_successfully
+    restart: "no"
+
+  mcp:
+    build: .
+    environment:
+      PORT: "3000"
+      GERMAN_LAW_DB_PATH: /data/database.db
+      MCP_BEARER_TOKEN: ${MCP_BEARER_TOKEN:-}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
+    volumes:
+      # The MCP tools are read-only, but the SQLite runtime needs permission to
+      # create transient journal/lock files beside the database.
+      - mcp-data:/data
+    depends_on:
+      export:
+        condition: service_completed_successfully
+    ports:
+      - "${PORT:-3000}:3000"
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  mcp-data:

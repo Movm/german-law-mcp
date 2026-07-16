@@ -11,7 +11,7 @@ import { createServer } from "node:http";
 import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { randomUUID } from "node:crypto";
+import { randomUUID, timingSafeEqual } from "node:crypto";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import {
@@ -20,10 +20,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { LawMcpShell } from "./shell/shell.js";
 import { germanyAdapter } from "./adapters/de.js";
-import { getCapabilities, getDb, getMetadata } from "./db/german-law-db.js";
-import { getPremiumTools } from "./premium-tools.js";
-import { responseMeta } from "./utils/metadata.js";
-import type { ComplianceMeta } from "./utils/metadata.js";
+import { getCapabilities } from "./db/german-law-db.js";
 import type { ToolName } from "./shell/types.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -42,19 +39,25 @@ try {
 }
 
 const SERVER_NAME = "german-law-mcp";
-
-function buildComplianceMeta(): ComplianceMeta {
-  try {
-    const dbMeta = getMetadata();
-    return responseMeta(dbMeta.built_at ?? new Date().toISOString().substring(0, 10));
-  } catch {
-    return responseMeta(new Date().toISOString().substring(0, 10));
-  }
-}
+const COMMUNITY_TOOLS = new Set([
+  "search_legislation",
+  "format_citation",
+  "check_currency",
+  "get_provision",
+  "parse_citation",
+  "validate_citation",
+  "list_sources",
+  "about",
+]);
+const BEARER_TOKEN = process.env.MCP_BEARER_TOKEN?.trim() ?? "";
+const ALLOWED_ORIGINS = new Set(
+  (process.env.ALLOWED_ORIGINS ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean),
+);
 
 function createMcpServer(): { server: Server; shell: LawMcpShell } {
-  const meta = buildComplianceMeta();
-
   const enrichedAdapter = {
     ...germanyAdapter,
     getDbCapabilities: () => getCapabilities(),
@@ -63,74 +66,36 @@ function createMcpServer(): { server: Server; shell: LawMcpShell } {
 
   const server = new Server(
     { name: SERVER_NAME, version: pkgVersion },
-    { capabilities: { tools: {} } },
+    {
+      capabilities: { tools: {} },
+      instructions:
+        "Searches the current, locally ingested German federal-law corpus. " +
+        "Always preserve source_url and source_snapshot in answers. This is not legal advice.",
+    },
   );
 
-  // Detect premium tools using the SDK's public API instead of wrapping
-  // internal _requestHandlers (which broke in SDK v1.27.1).
-  let premium: ReturnType<typeof getPremiumTools> = null;
-  try {
-    const db = getDb();
-    if (db) {
-      premium = getPremiumTools(db);
-    }
-  } catch (err) {
-    console.warn(`[${SERVER_NAME}] Premium tools not available:`, err);
-  }
-
-  const premiumToolNames = new Set(premium?.handlers.keys() ?? []);
-
   server.setRequestHandler(ListToolsRequestSchema, async () => {
-    const definitions = shell.getToolDefinitions();
+    const definitions = shell
+      .getToolDefinitions()
+      .filter((definition) => COMMUNITY_TOOLS.has(definition.name));
     const baseTools = definitions.map((def) => ({
       name: def.name,
       description: def.description,
       inputSchema: def.inputSchema,
+      annotations: { readOnlyHint: true },
     }));
-
-    if (!premium) return { tools: baseTools };
-
-    // Deduplicate: premium tools override base tools with the same name
-    const filtered = baseTools.filter((t) => !premiumToolNames.has(t.name));
-    return { tools: [...filtered, ...premium.tools] };
+    return { tools: baseTools };
   });
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const toolName = request.params.name;
     const args = (request.params.arguments ?? {}) as Record<string, unknown>;
 
-    // Premium tool — handle directly
-    const premiumHandler = premium?.handlers.get(toolName);
-    if (premiumHandler) {
-      try {
-        const rawData = premiumHandler(args);
-        // Attach _meta compliance block to premium tool responses
-        const data =
-          rawData !== null && rawData !== undefined && typeof rawData === "object"
-            ? { ...(rawData as Record<string, unknown>), _meta: meta }
-            : rawData;
-        return {
-          content: [
-            { type: "text" as const, text: JSON.stringify(data, null, 2) },
-          ],
-        };
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: JSON.stringify({
-                _error_type: "internal_error",
-                code: "internal_error",
-                message: `Error executing ${toolName}: ${message}`,
-                _meta: meta,
-              }),
-            },
-          ],
-          isError: true,
-        };
-      }
+    if (!COMMUNITY_TOOLS.has(toolName)) {
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({ error: "Unknown tool" }) }],
+        isError: true,
+      };
     }
 
     // Base tool — delegate to shell
@@ -191,6 +156,35 @@ async function main() {
     }
 
     if (url.pathname === "/mcp") {
+      if (!authorize(req)) {
+        res.writeHead(401, {
+          "Content-Type": "application/json",
+          "WWW-Authenticate": 'Bearer realm="german-law-mcp"',
+        });
+        res.end(JSON.stringify({ error: "Unauthorized" }));
+        return;
+      }
+
+      const origin = req.headers.origin;
+      if (origin && !ALLOWED_ORIGINS.has(origin)) {
+        res.writeHead(403, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Origin not allowed" }));
+        return;
+      }
+      if (origin) {
+        res.setHeader("Access-Control-Allow-Origin", origin);
+        res.setHeader("Vary", "Origin");
+      }
+      if (req.method === "OPTIONS") {
+        res.writeHead(204, {
+          "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+          "Access-Control-Allow-Headers":
+            "Authorization, Content-Type, MCP-Protocol-Version, MCP-Session-Id",
+        });
+        res.end();
+        return;
+      }
+
       const sessionId = req.headers["mcp-session-id"] as string | undefined;
 
       if (sessionId && sessions.has(sessionId)) {
@@ -238,6 +232,16 @@ async function main() {
     console.error("Received SIGTERM, shutting down...");
     httpServer.close(() => process.exit(0));
   });
+}
+
+function authorize(req: import("node:http").IncomingMessage): boolean {
+  if (!BEARER_TOKEN) return true;
+  const prefix = "Bearer ";
+  const authorization = req.headers.authorization ?? "";
+  if (!authorization.startsWith(prefix)) return false;
+  const supplied = Buffer.from(authorization.slice(prefix.length), "utf8");
+  const expected = Buffer.from(BEARER_TOKEN, "utf8");
+  return supplied.length === expected.length && timingSafeEqual(supplied, expected);
 }
 
 main().catch((error) => {

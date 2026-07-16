@@ -11,6 +11,7 @@ import assert from "node:assert/strict";
 import { buildDocCitation } from "../src/shell/shell.js";
 
 const VALID_LICENSE_CODES = new Set([
+  "dl-de/by-2-0 (verify source terms)",
   "Public-Domain",
   "CC-BY-4.0",
   "CC-BY-SA-4.0",
@@ -30,10 +31,10 @@ describe("buildDocCitation: Source Attribution Standard", () => {
       title: "BDSG § 1",
       source_url: "https://www.gesetze-im-internet.de/bdsg_2018/__1.html",
     });
-    assert.equal(c.publisher, "gesetze-im-internet.de");
-    assert.equal(c.license, "Public-Domain");
+    assert.equal(c.publisher, "QuantLaw archive / Gesetze im Internet");
+    assert.equal(c.license, "dl-de/by-2-0 (verify source terms)");
     assert.equal(c.source_url, "https://www.gesetze-im-internet.de/bdsg_2018/__1.html");
-    assert.equal(c.publisher_url, "https://www.gesetze-im-internet.de");
+    assert.equal(c.publisher_url, "https://github.com/QuantLaw/gesetze-im-internet");
     assert.ok(VALID_LICENSE_CODES.has(c.license as string));
   });
 
@@ -44,8 +45,8 @@ describe("buildDocCitation: Source Attribution Standard", () => {
       title: "DSDurchfG § 1",
       source_url: "https://www.gesetze-im-internet.de/example/__1.html",
     });
-    assert.equal(c.publisher, "gesetze-im-internet.de");
-    assert.equal(c.license, "Public-Domain");
+    assert.equal(c.publisher, "QuantLaw archive / Gesetze im Internet");
+    assert.equal(c.license, "dl-de/by-2-0 (verify source terms)");
   });
 
   test("case law carries Rechtsprechung attribution", () => {
@@ -99,8 +100,8 @@ describe("buildDocCitation: Source Attribution Standard", () => {
       kind: "ordinance",
       title: "Some ordinance",
     });
-    assert.equal(c.publisher, "gesetze-im-internet.de");
-    assert.equal(c.license, "Public-Domain");
+    assert.equal(c.publisher, "QuantLaw archive / Gesetze im Internet");
+    assert.equal(c.license, "Source terms apply");
   });
 
   test("canonical_ref + display_text + lookup unchanged (back-compat)", () => {

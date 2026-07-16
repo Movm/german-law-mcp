@@ -27,7 +27,7 @@ test("list_sources returns German data sources", async () => {
   assert.equal(result.ok, true);
   const data = result.data as { sources: unknown[] };
   assert.ok(Array.isArray(data.sources));
-  assert.equal(data.sources.length, 3);
+  assert.equal(data.sources.length, 2);
 });
 
 test("about returns server metadata", async () => {

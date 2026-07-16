@@ -1,6 +1,6 @@
 import type { ToolDefinition } from "./types.js";
 
-export const TOOL_DEFINITIONS: ToolDefinition[] = [
+const ALL_TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: "search_legislation",
     description:
@@ -361,10 +361,9 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     description:
       "Retrieve the full text of a specific statute provision. " +
       "Two argument shapes are supported: " +
-      "(a) `{law, article}` — the canonical gateway shape, e.g. `{law: 'BGB', article: '812'}`; " +
+      "(a) `{law, article}`, e.g. `{law: 'BGB', article: '812'}`; " +
       "(b) `{id}` — the document id returned by search results, e.g. `{id: 'bgb:812'}`. " +
-      "When both `law` and `article` are supplied they take precedence over `id`. " +
-      "Falls back to a search across statutes, case law, and preparatory works when only `id` is given.",
+      "When both `law` and `article` are supplied they take precedence over `id`.",
     inputSchema: {
       type: "object",
       required: [],
@@ -387,7 +386,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         country: {
           type: "string",
           description:
-            "Two-letter country code. Optional; the gateway injects 'DE' for this MCP.",
+            "Two-letter country code. Optional; this server supports DE.",
         },
       },
     },
@@ -448,9 +447,9 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: "about",
     description:
-      "Get server metadata: version, database tier, capabilities, data statistics, and source information. " +
+      "Get server metadata: version, community corpus, data statistics, limitations, and source information. " +
       "Use this to understand what this server provides and its current state. " +
-      "Returns version, tier (free/professional), document counts, and data freshness.",
+      "Returns version, document counts, source snapshot, and data freshness.",
     inputSchema: {
       type: "object",
       additionalProperties: false,
@@ -537,3 +536,19 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     },
   },
 ];
+
+const COMMUNITY_TOOL_NAMES = new Set([
+  "search_legislation",
+  "format_citation",
+  "check_currency",
+  "get_provision",
+  "parse_citation",
+  "validate_citation",
+  "list_sources",
+  "about",
+]);
+
+/** Tools backed by the reproducible QuantLaw community corpus. */
+export const TOOL_DEFINITIONS = ALL_TOOL_DEFINITIONS.filter((definition) =>
+  COMMUNITY_TOOL_NAMES.has(definition.name),
+);

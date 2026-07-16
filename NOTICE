@@ -1,0 +1,18 @@
+German Law MCP continuation
+Copyright 2026 Moritz Wächter and contributors
+
+This project continues and adapts code from:
+
+* Ansvar Systems AB, German-law-mcp, licensed under Apache-2.0
+  https://github.com/Ansvar-Systems/German-law-mcp
+* Niko Felger and contributors, gesetze-aus-dem-internet, licensed under
+  Apache-2.0. Its relational model and XML parser informed this pipeline.
+  https://github.com/nfelger/gesetze-aus-dem-internet
+* QuantLaw, legal-data-preprocessing, licensed under BSD-2-Clause. Its
+  snapshot-based processing approach informed the import workflow.
+  https://github.com/QuantLaw/legal-data-preprocessing
+
+Runtime source data is obtained from QuantLaw/gesetze-im-internet and the
+official Gesetze im Internet publication. No corpus database is distributed
+with this repository. Data provenance and reuse conditions are described in
+README.md and DISCLAIMER.md.

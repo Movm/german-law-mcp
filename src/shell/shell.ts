@@ -9,8 +9,6 @@ const PREMIUM_UPGRADE_MESSAGE =
   "Version tracking is available in the Ansvar Intelligence Portal. Contact hello@ansvar.ai for access.";
 import {
   getGermanLawDocumentCount,
-  getGermanCaseLawDocumentCount,
-  getGermanPreparatoryWorkCount,
   getMetadata,
 } from "../db/german-law-db.js";
 import { AdapterRegistry } from "./adapter-registry.js";
@@ -403,43 +401,28 @@ export class LawMcpShell {
       country: adapter.country.code,
       sources: [
         {
+          name: "QuantLaw / gesetze-im-internet",
+          url: "https://github.com/QuantLaw/gesetze-im-internet",
+          description:
+            "Independent, versioned archive of XML documents originally published by Gesetze im Internet.",
+          scope: "Consolidated German federal statutes and regulations present in the selected snapshot.",
+          limitations:
+            "Independent archive, not an official publication. No state law, case law, preparatory works, or guarantee of completeness.",
+          format: "Tagged Git snapshot containing XML",
+          updateFrequency: "Daily",
+          authority: "Archive: QuantLaw; original publication: Gesetze im Internet",
+        },
+        {
           name: "Gesetze im Internet",
           url: "https://www.gesetze-im-internet.de",
           description:
-            "Official portal of the German Federal Ministry of Justice. " +
-            "Provides consolidated texts of all German federal statutes and regulations.",
-          scope: "All consolidated German federal statutes (Bundesgesetze)",
-          limitations: "Does not include state (Länder) legislation.",
-          format: "XML download",
-          updateFrequency: "Daily",
-          authority: "Federal Ministry of Justice (BMJ)",
-        },
-        {
-          name: "Rechtsprechung im Internet",
-          url: "https://www.rechtsprechung-im-internet.de",
-          description:
-            "Official portal for published decisions of German federal courts.",
-          scope:
-            "BVerfG, BGH, BVerwG, BAG, BSG, BFH, BPatG decisions",
+            "Original publication portal for the consolidated federal-law XML archived by QuantLaw.",
+          scope: "Source provenance and verification links",
           limitations:
-            "Not all decisions are published. Lower court (Landesgerichte) decisions are not included.",
-          format: "XML download",
-          updateFrequency: "Daily",
-          authority: "German Federal Courts",
-        },
-        {
-          name: "DIP Bundestag",
-          url: "https://dip.bundestag.de",
-          description:
-            "Documentation and Information System of the German Bundestag. " +
-            "Provides legislative preparatory works including Drucksachen and Plenarprotokolle.",
-          scope:
-            "Drucksachen and Plenarprotokolle for Wahlperioden 19 and 20",
-          limitations:
-            "Bundesrat documents may be incomplete. Earlier Wahlperioden not yet ingested.",
-          format: "REST API",
-          updateFrequency: "Daily",
-          authority: "German Bundestag",
+            "The running server reads its pinned QuantLaw snapshot, not this portal live.",
+          format: "Official website and XML downloads",
+          updateFrequency: "Independent of this deployment",
+          authority: "German Federal Ministry of Justice / juris GmbH",
         },
       ],
     };
@@ -448,15 +431,12 @@ export class LawMcpShell {
   private async about(): Promise<unknown> {
     const dbMeta = getMetadata();
     const statuteCount = getGermanLawDocumentCount();
-    const caseCount = getGermanCaseLawDocumentCount();
-    const prepCount = getGermanPreparatoryWorkCount();
 
     return {
       server: "german-law-mcp",
       version: SERVER_VERSION,
       description:
-        "German legal research MCP server providing access to federal statutes, " +
-        "court decisions, and legislative preparatory works from official German government sources.",
+        "Self-hosted, read-only MCP server for the locally ingested German federal-law snapshot.",
       jurisdiction: "DE",
       language: "de",
       tier: dbMeta.tier,
@@ -467,16 +447,21 @@ export class LawMcpShell {
       },
       statistics: {
         statutes: statuteCount,
-        case_law_decisions: caseCount,
-        preparatory_works: prepCount,
+        case_law_decisions: 0,
+        preparatory_works: 0,
       },
       data_sources: [
-        "gesetze-im-internet.de",
-        "rechtsprechung-im-internet.de",
-        "dip.bundestag.de",
+        "github.com/QuantLaw/gesetze-im-internet",
+        "gesetze-im-internet.de (original provenance)",
       ],
       transports: ["stdio", "streamable-http"],
-      repository: "https://github.com/Ansvar-Systems/German-law-mcp",
+      repository: "https://github.com/wachawo/german-law-mcp",
+      limitations: [
+        "No case law or preparatory works in this community build",
+        "No historical diff support",
+        "No vector search or Qdrant",
+        "Not legal advice; verify against official publications",
+      ],
     };
   }
 
@@ -663,7 +648,7 @@ export class LawMcpShell {
  * License codes match `infrastructure/attribution-licenses.json` per the
  * Source Attribution Standard (CLAUDE.md). Per-kind derivation is required
  * because the upstream sources have different licenses:
- *   - statutes/regulations: Bundesministerium der Justiz (Public-Domain)
+ *   - statutes/regulations: QuantLaw archive of Gesetze im Internet
  *   - case law:             Bundesgerichte / Rechtsprechung (Public-Domain)
  *   - preparatory works:    Bundestag DIP API (CC-BY-4.0)
  */
@@ -675,14 +660,14 @@ type DocAttribution = {
 
 const ATTRIBUTION_BY_KIND: Record<string, DocAttribution> = {
   statute: {
-    publisher: "gesetze-im-internet.de",
-    license: "Public-Domain",
-    publisher_url: "https://www.gesetze-im-internet.de",
+    publisher: "QuantLaw archive / Gesetze im Internet",
+    license: "dl-de/by-2-0 (verify source terms)",
+    publisher_url: "https://github.com/QuantLaw/gesetze-im-internet",
   },
   regulation: {
-    publisher: "gesetze-im-internet.de",
-    license: "Public-Domain",
-    publisher_url: "https://www.gesetze-im-internet.de",
+    publisher: "QuantLaw archive / Gesetze im Internet",
+    license: "dl-de/by-2-0 (verify source terms)",
+    publisher_url: "https://github.com/QuantLaw/gesetze-im-internet",
   },
   case: {
     publisher: "Rechtsprechung im Internet",
@@ -697,9 +682,9 @@ const ATTRIBUTION_BY_KIND: Record<string, DocAttribution> = {
 };
 
 const FALLBACK_ATTRIBUTION: DocAttribution = {
-  publisher: "gesetze-im-internet.de",
-  license: "Public-Domain",
-  publisher_url: "https://www.gesetze-im-internet.de",
+  publisher: "QuantLaw archive / Gesetze im Internet",
+  license: "Source terms apply",
+  publisher_url: "https://github.com/QuantLaw/gesetze-im-internet",
 };
 
 function attributionForKind(kind: string | undefined): DocAttribution {

@@ -1,381 +1,173 @@
-# German Law MCP Server
+# German Law MCP
 
-<!-- ANSVAR-CTA-BEGIN -->
-> **The German law corpus is now served through the Ansvar Gateway.** Connect your AI assistant (Claude, Copilot, Cursor, custom MCP client) to `https://gateway.ansvar.eu/mcp` — one OAuth connection, free tier available, covering this corpus plus EU regulations, national law across 28 audited jurisdictions, and CVE/security intelligence, every result with a verbatim source citation. Start at https://ansvar.eu/docs/quickstart
+Ein selbst hostbarer, read-only MCP-Server für aktuelles deutsches Bundesrecht.
+Der Server importiert einen datierten Snapshot aus
+[QuantLaw/gesetze-im-internet](https://github.com/QuantLaw/gesetze-im-internet),
+speichert die strukturierte Fassung in PostgreSQL und erzeugt daraus einen
+kleinen SQLite-Leseindex für die MCP-Abfragen.
 
-### Connect
+> **Kein Rechtsrat:** Die Ergebnisse können unvollständig, veraltet oder durch
+> Parsingfehler verfälscht sein. Für verbindliche Fassungen immer die amtliche
+> Veröffentlichung und qualifizierte Rechtsberatung heranziehen.
 
-**Claude Code** (one line):
+## Aktueller Umfang
+
+Der Community-Server stellt acht read-only Tools bereit:
+
+- `search_legislation` – Volltext- und Zitationssuche
+- `get_provision` – einzelne Norm nach Gesetz/Artikel oder Ergebnis-ID
+- `parse_citation` und `format_citation` – deutsche Zitate zerlegen/normalisieren
+- `validate_citation` – Zitat gegen den importierten Bestand prüfen
+- `check_currency` – Aktualität relativ zum importierten Snapshot einschätzen
+- `list_sources` und `about` – Herkunft, Stand und Serverinformationen
+
+Bewusst **nicht** enthalten sind derzeit Rechtsprechung, Gesetzesmaterialien,
+historische Norm-Diffs, EU-Zuordnungen oder semantische Suche.
+
+## Architektur und transparente Herkunft
+
+```text
+QuantLaw Snapshot (XML, datierter Git-Tag)
+                  │
+                  ▼
+      moderner GII-XML-Importer
+                  │
+                  ▼
+      PostgreSQL (kanonische Fassung)
+                  │
+                  ▼
+     reproduzierbarer SQLite-Export
+                  │
+                  ▼
+       MCP Streamable HTTP /mcp
+```
+
+PostgreSQL ist die lokale Datenwahrheit. SQLite ist nur ein wegwerfbares,
+read-only Suchmodell für die fortgeführte Ansvar-MCP-Schicht. Diese Trennung
+ermöglicht einen kleinen Runtime-Container, ohne Herkunft oder Struktur der
+Daten zu verlieren.
+
+**Qdrant, Embeddings und andere Vektordatenbanken werden in diesem Stand nicht
+verwendet.** Eine spätere semantische Suche wäre ein optionaler Index und würde
+PostgreSQL nicht als Quelle ersetzen.
+
+Verwendete Vorarbeiten:
+
+| Projekt | Verwendung | Lizenz |
+| --- | --- | --- |
+| [Ansvar-Systems/German-law-mcp](https://github.com/Ansvar-Systems/German-law-mcp) | MCP-Vertrag, Zitationslogik, SQLite-Leseschicht | Apache-2.0 |
+| [nfelger/gesetze-aus-dem-internet](https://github.com/nfelger/gesetze-aus-dem-internet) | Vorbild für relationales Modell und GII-Parsing | Apache-2.0 |
+| [QuantLaw/gesetze-im-internet](https://github.com/QuantLaw/gesetze-im-internet) | datierte Rohdaten-Snapshots | BSD-3-Clause für Repository-Code; Datenherkunft separat beachten |
+| [QuantLaw/legal-data-preprocessing](https://github.com/QuantLaw/legal-data-preprocessing) | Vorbild für Snapshot-Verarbeitung | BSD-2-Clause |
+
+Die konkreten Hinweise stehen zusätzlich in [NOTICE](NOTICE). Dieses Repository
+enthält **keine fertig gebaute Gesetzesdatenbank**. Jeder Betreiber erzeugt den
+Bestand reproduzierbar aus einem explizit gewählten Snapshot.
+
+## Schnellstart mit Docker Compose
+
+1. Einen existierenden `YYYY-MM-DD`-Tag im
+   [QuantLaw-Repository](https://github.com/QuantLaw/gesetze-im-internet/tags)
+   auswählen.
+2. Konfiguration anlegen: `cp .env.example .env`
+3. Mindestens diese Variablen setzen:
+
+```dotenv
+POSTGRES_PASSWORD=<langes-zufälliges-passwort>
+QUANTLAW_SNAPSHOT=2026-07-16
+MCP_BEARER_TOKEN=<langes-zufälliges-token>
+ALLOWED_ORIGINS=https://claude.ai,https://chatgpt.com
+```
+
+Danach:
 
 ```bash
-claude mcp add ansvar --transport http https://gateway.ansvar.eu/mcp
+docker compose up --build
 ```
 
-**Claude Desktop / Cursor** — add to `claude_desktop_config.json` (or `mcp.json`):
+Der einmalige Import kann je nach Snapshot und Verbindung dauern. Anschließend:
 
-```json
-{
-  "mcpServers": {
-    "ansvar": {
-      "type": "url",
-      "url": "https://gateway.ansvar.eu/mcp"
-    }
-  }
-}
-```
+- Health: `http://localhost:3000/health`
+- MCP: `http://localhost:3000/mcp`
 
-**Claude.ai** — Settings → Connectors → Add custom connector → paste `https://gateway.ansvar.eu/mcp`
-
-First request opens an OAuth signup flow (setup details: [ansvar.eu/docs/quickstart](https://ansvar.eu/docs/quickstart)). After signup, your client is bound to your account; tier (free / premium / team / company) determines fan-out, quota, and which downstream MCPs are reachable.
-
----
-
-## Self-host this MCP
-
-You can also clone this repo and build the corpus yourself. The schema,
-fetcher, and tool implementations all live here. What is not in the repo is
-the pre-built database — TDM and standards-licensing constraints on the
-upstream sources mean we host the corpus on Ansvar infrastructure rather
-than redistribute it as a public artifact.
-
-Build your own: run this repo's ingestion script (entry-point varies per
-repo — typically `scripts/ingest.sh`, `npm run ingest`, or `make ingest`;
-check the repo root).
-<!-- ANSVAR-CTA-END -->
-
-
-**The gesetze-im-internet.de alternative for the AI age.**
-
-[![MCP Registry](https://img.shields.io/badge/MCP-Registry-blue)](https://registry.modelcontextprotocol.io)
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![GitHub stars](https://img.shields.io/github/stars/Ansvar-Systems/German-law-mcp?style=social)](https://github.com/Ansvar-Systems/German-law-mcp)
-[![CI](https://github.com/Ansvar-Systems/German-law-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/Ansvar-Systems/German-law-mcp/actions/workflows/ci.yml)
-[![Daily Data Check](https://github.com/Ansvar-Systems/German-law-mcp/actions/workflows/check-updates.yml/badge.svg)](https://github.com/Ansvar-Systems/German-law-mcp/actions/workflows/check-updates.yml)
-
-Query **6,870 German federal statutes** -- from the BGB and StGB to the GG, BDSG, and more -- directly from Claude, Cursor, or any MCP-compatible client.
-
-If you're building legal tech, compliance tools, or doing German legal research, this is your verified reference database.
-
-Built by [Ansvar Systems](https://ansvar.eu) -- Stockholm, Sweden
-
----
-
-## Why This Exists
-
-German legal research is scattered across gesetze-im-internet.de, dejure.org, rechtsprechung-im-internet.de, and DIP Bundestag. Whether you're:
-- A **Rechtsanwalt** validating citations in a Schriftsatz or contract
-- A **compliance officer** checking if a statute is still in force
-- A **legal tech developer** building tools on German law
-- A **researcher** tracing legislative history from Drucksache to statute
-
-...you shouldn't need 47 browser tabs and manual PDF cross-referencing. Ask Claude. Get the exact provision. With context.
-
-This MCP server makes German law **searchable, cross-referenceable, and AI-readable**.
-
----
-
-## Example Queries
-
-Once connected, just ask naturally:
-
-- *"Was sagt § 823 Abs. 1 BGB über Schadensersatz?"*
-- *"Ist das BDSG 2018 noch in Kraft?"*
-- *"Find provisions about Datenschutz in German law"*
-- *"What EU directives does the BDSG implement?"*
-- *"Which German laws implement the GDPR?"*
-- *"Get the preparatory works for the IT-Sicherheitsgesetz"*
-- *"Validate the citation § 433 BGB"*
-- *"Search for Kündigungsschutz in case law"*
-- *"Compare DSGVO implementation across German statutes"*
-
----
-
-## What's Included
-
-| Category | Count | Details |
-|----------|-------|---------|
-| **Statutes** | 6,870 laws | Complete German federal legislation |
-| **Provisions** | 91,843 sections | Full-text searchable with FTS5 |
-| **Case Law** | 5,000 decisions | BVerfG, BGH, BVerwG, BAG, BSG, BFH, BPatG |
-| **Preparatory Works** | 89,423 records | Drucksachen + Plenarprotokolle (WP 19 + 20) |
-| **Database Size** | ~300 MB | Runtime download on cold start (Strategy B) |
-| **Daily Updates** | Automated | Freshness checks against gesetze-im-internet.de |
-
-**Verified data only** -- every provision is ingested from official government sources. Zero LLM-generated content.
-
----
-
-## See It In Action
-
-### Why This Works
-
-**Verbatim Source Text (No LLM Processing):**
-- All statute text is ingested from gesetze-im-internet.de official XML exports
-- Provisions are returned **unchanged** from SQLite FTS5 database rows
-- Zero LLM summarization or paraphrasing -- the database contains regulation text, not AI interpretations
-
-**Smart Context Management:**
-- Search returns ranked provisions with BM25 scoring (safe for context)
-- Three-tier search strategy: exact citation match → FTS5 full-text → LIKE fallback
-- Cross-references help navigate without loading everything at once
-
-**Technical Architecture:**
-```
-gesetze-im-internet.de → Parse XML → SQLite → FTS5 snippet() → MCP response
-                  ↑                          ↑
-           Provision parser           Verbatim database query
-```
-
-### Traditional Research vs. This MCP
-
-| Traditional Approach | This MCP Server |
-|---------------------|-----------------|
-| Search gesetze-im-internet.de by law name | Search by plain German: *"Datenschutz Arbeitnehmer"* |
-| Navigate multi-section statutes manually | Get the exact provision with context |
-| Manual cross-referencing between laws | `build_legal_stance` aggregates across sources |
-| "Is this statute still in force?" → check manually | `check_currency` → answer in seconds |
-| Find EU basis → dig through EUR-Lex | `get_eu_basis` → linked EU directives instantly |
-| Check DIP Bundestag for legislative history | `get_preparatory_works` → structured results |
-| No API, no integration | MCP protocol → AI-native |
-
-**Traditional:** Search gesetze-im-internet.de → Download XML → Ctrl+F → Cross-reference with Drucksache → Check EUR-Lex for EU basis → Repeat
-
-**This MCP:** *"What EU law is the basis for § 1 BDSG?"* → Done.
-
----
-
-## Available Tools (19)
-
-### Core Legal Research Tools (8)
-
-| Tool | Description |
-|------|-------------|
-| `search_legislation` | FTS5 search on 91,843 provisions with BM25 ranking |
-| `get_provision` | Retrieve specific provision by document ID |
-| `search_case_law` | Search 5,000 federal court decisions with court/date filters |
-| `get_preparatory_works` | Get Drucksachen and Plenarprotokolle for a statute |
-| `validate_citation` | Validate citation against database (zero-hallucination check) |
-| `build_legal_stance` | Aggregate citations from statutes, case law, prep works |
-| `format_citation` | Format citations per German conventions (default/short/pinpoint) |
-| `check_currency` | Check if statute is in force in the ingested corpus |
-
-### Citation Tools (2)
-
-| Tool | Description |
-|------|-------------|
-| `parse_citation` | Parse `§ 823 Abs. 1 BGB` or `Art. 1 Abs. 1 GG` into structured components |
-| `validate_citation` | Check if a citation exists in the database |
-
-### EU Law Integration Tools (5)
-
-| Tool | Description |
-|------|-------------|
-| `get_eu_basis` | Get EU directives/regulations for a German statute |
-| `get_german_implementations` | Find German laws implementing an EU act |
-| `search_eu_implementations` | Search EU documents with German implementation counts |
-| `get_provision_eu_basis` | Get EU law references for specific provision |
-| `validate_eu_compliance` | Check implementation status |
-
-### Discovery & Metadata Tools (2)
-
-| Tool | Description |
-|------|-------------|
-| `list_sources` | Data provenance and source metadata |
-| `about` | Server version, tier, statistics, and freshness |
-
----
-
-## Data Sources & Freshness
-
-All content is sourced from authoritative German legal databases:
-
-- **[gesetze-im-internet.de](https://www.gesetze-im-internet.de/)** -- Federal Ministry of Justice, all consolidated federal statutes
-- **[rechtsprechung-im-internet.de](https://www.rechtsprechung-im-internet.de/)** -- Federal court decisions (BVerfG, BGH, BVerwG, BAG, BSG, BFH, BPatG)
-- **[DIP Bundestag](https://dip.bundestag.de/)** -- Legislative preparatory works (Drucksachen, Plenarprotokolle)
-- **[EUR-Lex](https://eur-lex.europa.eu/)** -- EU cross-reference metadata
-
-### Automated Freshness Checks (Daily)
-
-A [daily GitHub Actions workflow](.github/workflows/check-updates.yml) monitors all data sources:
-
-| Source | Check | Method |
-|--------|-------|--------|
-| **Statute amendments** | gesetze-im-internet.de XML index | All 6,870 statutes checked |
-| **New statutes** | New entries in federal gazette | Diffed against database |
-| **Case law** | rechtsprechung-im-internet.de feed | Compared to database |
-| **Preparatory works** | DIP API query (30-day window) | New records detected |
-
----
-
-## Security
-
-This project uses multiple layers of automated security scanning:
-
-| Scanner | What It Does | Schedule |
-|---------|-------------|----------|
-| **CodeQL** | Static analysis for security vulnerabilities | Weekly + PRs |
-| **Semgrep** | SAST scanning (OWASP top 10, secrets, TypeScript) | Every push |
-| **Gitleaks** | Secret detection across git history | Every push |
-| **Trivy** | CVE scanning on filesystem and npm dependencies | Daily |
-| **Docker Security** | Container image scanning + SBOM generation | Daily |
-| **Socket.dev** | Supply chain attack detection | PRs |
-| **OSSF Scorecard** | OpenSSF best practices scoring | Weekly |
-
-See [SECURITY.md](SECURITY.md) for the full policy and vulnerability reporting.
-
----
-
-## Important Disclaimers
-
-### Legal Advice
-
-> **THIS TOOL IS NOT LEGAL ADVICE**
->
-> Statute text is sourced from official gesetze-im-internet.de publications. However:
-> - This is a **research tool**, not a substitute for professional legal counsel
-> - **Court case coverage is limited** (5,000 decisions) -- do not rely solely on this for case law research
-> - **Verify critical citations** against primary sources for court filings
-> - **EU cross-references** are extracted from German statute text, not EUR-Lex full text
-
-**Before using professionally, read:** [DISCLAIMER.md](DISCLAIMER.md) | [PRIVACY.md](PRIVACY.md)
-
-### Client Confidentiality
-
-Queries go through the Claude API. For privileged or confidential matters, use on-premise deployment. Lawyers should consider Bundesrechtsanwaltskammer (BRAK) confidentiality obligations when using cloud-based AI tools. See [PRIVACY.md](PRIVACY.md) for compliance guidance.
-
----
-
-## Documentation
-
-- **[Architecture](docs/ARCHITECTURE.md)** -- Multi-country adapter architecture
-- **[Accuracy Plan](docs/ACCURACY_PLAN.md)** -- Roadmap to production accuracy
-- **[Auto Update](docs/AUTO_UPDATE.md)** -- Automated data freshness system
-- **[Security Policy](SECURITY.md)** -- Vulnerability reporting and scanning details
-- **[Disclaimer](DISCLAIMER.md)** -- Legal disclaimers and professional use notices
-- **[Privacy](PRIVACY.md)** -- Client confidentiality and data handling
-
----
-
-## Development
-
-### Branching Strategy
-
-This repository uses a `dev` integration branch. **Do not push directly to `main`.**
-
-```
-feature-branch → PR to dev → verify on dev → PR to main → deploy
-```
-
-- `main` is production-ready. Only receives merges from `dev` via PR.
-- `dev` is the integration branch. All changes land here first.
-- Feature branches are created from `dev`.
-
-### Setup
+Neuen Snapshot einspielen:
 
 ```bash
-git clone https://github.com/Ansvar-Systems/German-law-mcp
-cd German-law-mcp
-npm install
-npm run build
-npm test
+docker compose run --rm ingest
+docker compose run --rm export
+docker compose restart mcp
 ```
 
-### Running Locally
+## Zugriffsschutz
+
+Wenn `MCP_BEARER_TOKEN` gesetzt ist, verlangt `/mcp`:
+
+```http
+Authorization: Bearer <token>
+```
+
+Browser-Anfragen mit `Origin` werden zusätzlich nur akzeptiert, wenn der
+Ursprung in `ALLOWED_ORIGINS` steht. Ohne Bearer-Token ist der Server
+ungeschützt; das ist ausschließlich für lokale Entwicklung gedacht.
+
+Beispiel für Claude Code:
 
 ```bash
-npm run dev                                       # Start MCP server
-npx @anthropic/mcp-inspector node dist/index.js   # Test with MCP Inspector
+claude mcp add --transport http german-law https://recht.example.de/mcp \
+  --header "Authorization: Bearer $GERMAN_LAW_MCP_TOKEN"
 ```
 
-### Data Management
+Claude.ai, ChatGPT und andere gehostete Connector-Oberflächen unterstützen
+statische Bearer-Tokens nicht in jeder Konfiguration. Für mehrere Nutzer oder
+öffentliche Connector-Registrierung ist OAuth 2.1 mit Protected Resource
+Metadata der vorgesehene nächste Schritt. Der Bearer-Modus ist für den privaten
+Grünerator und kontrollierte Clients gedacht.
+
+## Coolify
+
+- Ressource als Docker-Compose-Projekt aus diesem Repository anlegen.
+- Variablen aus `.env.example` in Coolify setzen; Secrets nicht committen.
+- Eine persistente Domain auf Dienst `mcp`, Port `3000`, legen.
+- Healthcheck: `/health`; MCP-Pfad: `/mcp`.
+- PostgreSQL- und `mcp-data`-Volumes persistent halten.
+
+Das Repository lädt beim ersten Lauf den gewählten QuantLaw-Tag. Ein Tag statt
+`latest` macht Build und Datenstand prüfbar und wiederholbar.
+
+## Lokale Entwicklung
+
+Node.js 20+ und Python 3.13 werden unterstützt.
 
 ```bash
-npm run ingest                    # Ingest statutes from gesetze-im-internet.de
-npm run ingest:cases              # Ingest case law from rechtsprechung-im-internet.de
-npm run ingest:prep               # Ingest preparatory works from DIP Bundestag
-npm run auto-update               # Run full update cycle
-npm run auto-update:dry-run       # Preview what would be updated
-npm run drift:detect              # Detect schema/data drift
+npm ci
+npm run validate
+python -m unittest discover -s pipeline/tests
 ```
 
-### Performance
+Parser mit lokal vorhandenem QuantLaw-Datenzweig testen:
 
-- **Search Speed:** <100ms for most FTS5 queries
-- **Database Size:** ~300 MB (runtime download, Strategy B)
-- **Ingestion Coverage:** 6,870/6,870 statutes (100% TOC coverage)
-
----
-
-## More Ansvar MCPs
-
-Full fleet coverage at [ansvar.eu/coverage](https://ansvar.eu/coverage).
-## Contributing
-
-Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-Priority areas:
-- Lower court decisions (Landesgerichte, Oberlandesgerichte)
-- Historical statute versions and amendment tracking (Fassungsvergleich)
-- Expanded case law coverage (currently 5,000 of ~50,000+ published decisions)
-- State law (Landesrecht) for major Bundesländer
-
----
-
-## Roadmap
-
-- [x] **Full statute coverage** -- 6,870 federal statutes, 91,843 provisions
-- [x] **Case law** -- 5,000 federal court decisions
-- [x] **Preparatory works** -- 89,423 DIP records (WP 19 + 20)
-- [x] **EU cross-references** -- Extracted from statute text
-- [x] **Citation parsing** -- `§ 823 Abs. 1 BGB` and `Art. 1 Abs. 1 GG` formats
-- [x] **Free/Professional tier gating** -- Honest messaging for tier limitations
-- [ ] Expanded case law (full archive, ~50,000+ decisions)
-- [ ] Lower court coverage (Landesgerichte)
-- [ ] Historical statute versions (Fassungsvergleich)
-- [ ] State law (Landesrecht)
-- [ ] English translations for key statutes
-
----
-
-## Citation
-
-If you use this MCP server in academic research:
-
-```bibtex
-@software{german_law_mcp_2025,
-  author = {Ansvar Systems AB},
-  title = {German Law MCP Server: Production-Grade Legal Research Tool},
-  year = {2025},
-  url = {https://github.com/Ansvar-Systems/German-law-mcp},
-  note = {Comprehensive German legal database with 6,870 statutes, 91,843 provisions, and EU cross-references}
-}
+```bash
+python -m pipeline.import_quantlaw \
+  --repo-dir /path/to/gesetze-im-internet \
+  --snapshot 2026-07-16 \
+  --limit 10
 ```
 
----
+## Daten- und Nutzungsbedingungen
 
-## License
+- Amtliche Texte werden von
+  [Gesetze im Internet](https://www.gesetze-im-internet.de/) veröffentlicht.
+- Der Abruf erfolgt über das unabhängige QuantLaw-Archiv. Betreiber müssen die
+  Nutzungsbedingungen, Quellenangaben, Abruflast und Rechte möglicher Anlagen
+  selbst prüfen und einhalten.
+- Das Projekt verspricht keine Vollständigkeit, Echtheit oder tagesaktuelle
+  Rechtslage. Der importierte Snapshot wird in Dokument-Metadaten mitgeführt.
+- Der Server ist für Recherche und technische Integration gedacht, nicht für
+  automatisierte Rechtsentscheidungen ohne menschliche Prüfung.
 
-Apache License 2.0. See [LICENSE](./LICENSE) for details.
+## Lizenz
 
-### Data Licenses
-
-- **Statutes & Regulations:** `German-UrhG-Section-5` -- German statutory public domain. UrhG §5(1) "Amtliche Werke" excludes statutes, ordinances, official decrees and notices, decisions and officially drafted headnotes from copyright protection; §5(2) extends to other official works published in the official interest. Verified verbatim 2026-05-17 -- see [`docs/audits/2026-05-17-eu-copyright-statutory-works-batch-1b-DE-IE-IT-NL-ES.md`](https://github.com/Ansvar-Systems/Ansvar-Architecture-Documentation/blob/main/docs/audits/2026-05-17-eu-copyright-statutory-works-batch-1b-DE-IE-IT-NL-ES.md). Catalog entry: `German-UrhG-Section-5` in `infrastructure/attribution-licenses.json`.
-- **Case Law:** rechtsprechung-im-internet.de -- same statutory basis (UrhG §5(1) decisions clause)
-- **Preparatory Works:** DIP Bundestag -- UrhG §5(2) official-interest publications
-- **EU Metadata:** EUR-Lex (EU public domain, Decision 2011/833/EU)
-
----
-
-## About Ansvar Systems
-
-We build AI-accelerated compliance and legal research tools for the European market. This MCP server started as our internal reference tool for German law -- turns out everyone building for the DACH market has the same research frustrations.
-
-So we're open-sourcing it. Navigating 6,870 statutes shouldn't require a law degree.
-
-**[ansvar.eu](https://ansvar.eu)** -- Stockholm, Sweden
-
----
-
-<p align="center">
-  <sub>Built with care in Stockholm, Sweden</sub>
-</p>
+Servercode: [Apache License 2.0](LICENSE). Hinweise auf übernommene und
+inspirierende Projekte: [NOTICE](NOTICE). Quelltexte und Datensätze behalten
+ihre jeweiligen Rechte und Bedingungen; die Apache-2.0-Lizenz dieses Servers
+beansprucht keine Rechte an den amtlichen oder archivierten Inhalten.

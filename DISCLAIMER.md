@@ -1,5 +1,11 @@
 # Legal Disclaimer
 
+This community continuation is independent from Ansvar Systems, QuantLaw, the
+German Federal Ministry of Justice, juris GmbH, and the operators of Gesetze im
+Internet. Mentioning these sources does not imply endorsement. It exposes only
+a locally generated snapshot and makes no guarantee of completeness,
+authenticity, currency, or legal correctness.
+
 **READ THIS CAREFULLY BEFORE USING THIS SOFTWARE**
 
 ## Not Legal Advice

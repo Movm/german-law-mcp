@@ -20,7 +20,7 @@ export type Capability =
   | 'full_preparatory_works'
   | 'agency_guidance';
 
-export type Tier = 'free' | 'professional' | 'unknown';
+export type Tier = 'community' | 'free' | 'professional' | 'unknown';
 
 export interface DbMetadata {
   tier: Tier;
@@ -90,7 +90,10 @@ export function readDbMetadata(
     const map = new Map(rows.map((r) => [r.key, r.value]));
 
     const rawTier = map.get('tier') ?? 'unknown';
-    const tier: Tier = rawTier === 'free' || rawTier === 'professional' ? rawTier : 'unknown';
+    const tier: Tier =
+      rawTier === 'community' || rawTier === 'free' || rawTier === 'professional'
+        ? rawTier
+        : 'unknown';
 
     return {
       tier,

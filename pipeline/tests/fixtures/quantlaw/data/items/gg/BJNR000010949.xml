@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<dokumente>
+  <norm doknr="BJNR000010949" builddate="20260716">
+    <metadaten>
+      <jurabk>GG</jurabk>
+      <amtabk>GG</amtabk>
+      <ausfertigung-datum>1949-05-23</ausfertigung-datum>
+      <langue>Grundgesetz für die Bundesrepublik Deutschland</langue>
+      <kurzue>Grundgesetz</kurzue>
+    </metadaten>
+  </norm>
+  <norm doknr="BJNR000010949BJNE000100000">
+    <metadaten>
+      <enbez>Art 1</enbez>
+      <titel>Menschenwürde</titel>
+    </metadaten>
+    <textdaten>
+      <text>
+        <Content><P>Die Würde des Menschen ist unantastbar.</P></Content>
+      </text>
+    </textdaten>
+  </norm>
+</dokumente>
