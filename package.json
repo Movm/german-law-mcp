@@ -60,7 +60,7 @@
     "typescript": "^5.7.3"
   },
   "dependencies": {
-    "@ansvar/mcp-sqlite": "^1.0.3",
+    "@ansvar/mcp-sqlite": "^1.0.5",
     "@modelcontextprotocol/sdk": "^1.26.0"
   },
   "overrides": {
