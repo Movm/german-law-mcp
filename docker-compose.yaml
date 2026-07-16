@@ -56,8 +56,8 @@ services:
     depends_on:
       export:
         condition: service_completed_successfully
-    ports:
-      - "${PORT:-3000}:3000"
+    expose:
+      - "3000"
     restart: unless-stopped
 
 volumes:

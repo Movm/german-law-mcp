@@ -125,7 +125,8 @@ Grünerator und kontrollierte Clients gedacht.
 
 ## Coolify
 
-- Ressource als Docker-Compose-Projekt aus diesem Repository anlegen.
+- Ressource als Docker-Compose-Projekt aus diesem Repository anlegen
+  (`/docker-compose.yaml`).
 - Variablen aus `.env.example` in Coolify setzen; Secrets nicht committen.
 - Eine persistente Domain auf Dienst `mcp`, Port `3000`, legen.
 - Healthcheck: `/health`; MCP-Pfad: `/mcp`.
