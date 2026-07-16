@@ -1,7 +1,7 @@
 {
-  "name": "@wachawo/german-law-mcp",
+  "name": "@movm/german-law-mcp",
   "version": "0.5.0",
-  "mcpName": "de.wachawo/german-law-mcp",
+  "mcpName": "de.movm/german-law-mcp",
   "description": "Self-hosted German federal-law MCP with transparent QuantLaw provenance",
   "type": "module",
   "main": "dist/index.js",
@@ -17,12 +17,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/wachawo/german-law-mcp.git"
+    "url": "git+https://github.com/Movm/german-law-mcp.git"
   },
   "bugs": {
-    "url": "https://github.com/wachawo/german-law-mcp/issues"
+    "url": "https://github.com/Movm/german-law-mcp/issues"
   },
-  "homepage": "https://github.com/wachawo/german-law-mcp#readme",
+  "homepage": "https://github.com/Movm/german-law-mcp#readme",
   "keywords": [
     "mcp",
     "model-context-protocol",

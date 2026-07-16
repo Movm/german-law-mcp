@@ -204,7 +204,7 @@ def safe_extract(payload: bytes, destination: Path) -> None:
 
 def download_snapshot(snapshot: str, destination: Path, template: str) -> Path:
     url = template.format(snapshot=urllib.parse.quote(snapshot, safe=""))
-    request = urllib.request.Request(url, headers={"User-Agent": "wachawo-german-law-mcp/0.1"})
+    request = urllib.request.Request(url, headers={"User-Agent": "movm-german-law-mcp/0.1"})
     with urllib.request.urlopen(request, timeout=120) as response:
         safe_extract(response.read(), destination)
     roots = list(destination.glob("gesetze-im-internet-*"))

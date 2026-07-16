@@ -455,7 +455,7 @@ export class LawMcpShell {
         "gesetze-im-internet.de (original provenance)",
       ],
       transports: ["stdio", "streamable-http"],
-      repository: "https://github.com/wachawo/german-law-mcp",
+      repository: "https://github.com/Movm/german-law-mcp",
       limitations: [
         "No case law or preparatory works in this community build",
         "No historical diff support",

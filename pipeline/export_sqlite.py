@@ -113,7 +113,7 @@ def build(args: argparse.Namespace) -> dict[str, object]:
                 ("tier", "community"),
                 ("schema_version", "2"),
                 ("built_at", built_at),
-                ("builder", "wachawo/german-law-mcp pipeline"),
+                ("builder", "Movm/german-law-mcp pipeline"),
                 ("source", "QuantLaw/gesetze-im-internet"),
             ],
         )
