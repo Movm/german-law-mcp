@@ -58,6 +58,19 @@ services:
         condition: service_completed_successfully
     expose:
       - "3000"
+    labels:
+      - traefik.enable=true
+      - traefik.http.middlewares.german-law-mcp-redirect.redirectscheme.scheme=https
+      - traefik.http.routers.german-law-mcp-http.entrypoints=http
+      - traefik.http.routers.german-law-mcp-http.middlewares=german-law-mcp-redirect
+      - traefik.http.routers.german-law-mcp-http.rule=Host(`german-law-mcp.moritz-waechter.de`)
+      - traefik.http.routers.german-law-mcp-http.service=german-law-mcp
+      - traefik.http.routers.german-law-mcp-https.entrypoints=https
+      - traefik.http.routers.german-law-mcp-https.rule=Host(`german-law-mcp.moritz-waechter.de`)
+      - traefik.http.routers.german-law-mcp-https.service=german-law-mcp
+      - traefik.http.routers.german-law-mcp-https.tls=true
+      - traefik.http.routers.german-law-mcp-https.tls.certresolver=letsencrypt
+      - traefik.http.services.german-law-mcp.loadbalancer.server.port=3000
     restart: unless-stopped
 
 volumes:
