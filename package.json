@@ -61,7 +61,7 @@
   },
   "dependencies": {
     "@ansvar/mcp-sqlite": "^1.0.3",
-    "@modelcontextprotocol/sdk": "^1.26.0"
+    "@modelcontextprotocol/sdk": "^1.29.0"
   },
   "overrides": {
     "esbuild": "^0.28.1"
