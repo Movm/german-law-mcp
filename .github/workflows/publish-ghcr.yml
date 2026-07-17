@@ -1,19 +1,11 @@
 # =============================================================================
-# Publish GHCR Image — Build, push, scan, and trigger prod deploy
+# Publish GHCR Image — Build, push, and scan
 # =============================================================================
 #
 # Triggered on push to main when source, data, Dockerfile, or this workflow
-# itself changes. Builds and pushes to GHCR, runs Trivy image scan, then
-# kicks Watchtower's HTTP API on prod for near-instant deploy.
-#
-# Watchtower kick (added 2026-05-07): Watchtower 1.7.1's hourly poll can
-# silently no-op when the local image cache equals the remote manifest
-# (e.g. after an operator's `docker pull`), leaving the running container
-# stuck on the old image. Explicit POST to /v1/update after build closes
-# this gap; mirrors ansvar-mcp-gateway/.github/workflows/deploy.yml. The
-# kick is best-effort — if WATCHTOWER_HTTP_API_TOKEN is unset or the
-# endpoint is down, the hourly poll remains as the safety net. (Memory:
-# feedback_watchtower_silent_skip_after_manual_pull.md)
+# itself changes. Builds and pushes to the current repository owner's GHCR
+# namespace, then runs a Trivy image scan. Coolify deploys from this Git
+# repository independently; this workflow does not mutate production.
 #
 # DB provisioning (added 2026-05-07): if the Dockerfile COPYs a .db file
 # and that file is missing/empty/an LFS pointer after checkout, fall back
@@ -27,10 +19,6 @@
 # Trivy scans the just-built image for CRITICAL and HIGH CVEs; results are
 # uploaded to the GitHub Security tab as SARIF (post-merge audit trail,
 # not a merge gate; see spec §5.1.1).
-#
-# OPTIONAL SECRET — WATCHTOWER_HTTP_API_TOKEN: org-level secret recommended
-# so the entire law-mcp fleet picks it up automatically. Without it, the
-# kick step prints an info message and exits 0 (no failure).
 #
 # =============================================================================
 
@@ -165,13 +153,16 @@ jobs:
             fi
           done
 
-      - name: Set image name from package.json
+      - name: Set image coordinates
         id: meta
+        shell: bash
         run: |
-          NAME=$(node -e "console.log(require('./package.json').name.replace('@ansvar/', ''))")
+          set -euo pipefail
+          NAME=$(node -e "console.log(require('./package.json').name.split('/').pop().toLowerCase())")
+          OWNER=$(printf '%s' "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')
           VERSION=$(node -e "console.log(require('./package.json').version)")
-          echo "image_name=${NAME}" >> $GITHUB_OUTPUT
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "image_ref=${REGISTRY}/${OWNER}/${NAME}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -186,45 +177,20 @@ jobs:
           context: .
           push: true
           tags: |
-            ${{ env.REGISTRY }}/ansvar-systems/${{ steps.meta.outputs.image_name }}:latest
-            ${{ env.REGISTRY }}/ansvar-systems/${{ steps.meta.outputs.image_name }}:${{ steps.meta.outputs.version }}
+            ${{ steps.meta.outputs.image_ref }}:latest
+            ${{ steps.meta.outputs.image_ref }}:${{ steps.meta.outputs.version }}
 
       - name: Trivy image scan
         uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1  # v0.35.0
         with:
-          image-ref: ${{ env.REGISTRY }}/ansvar-systems/${{ steps.meta.outputs.image_name }}:${{ steps.meta.outputs.version }}
+          image-ref: ${{ steps.meta.outputs.image_ref }}:${{ steps.meta.outputs.version }}
           format: sarif
           output: trivy-results.sarif
           severity: CRITICAL,HIGH
 
       - name: Upload Trivy results to Security tab
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        if: success()
         continue-on-error: true  # Code Security must be enabled on the repo for upload to succeed; non-fatal per workflow header (post-merge audit trail, not a merge gate)
         with:
           sarif_file: trivy-results.sarif
-
-      - name: Trigger Watchtower update on prod
-        if: success() && github.ref == 'refs/heads/main'
-        continue-on-error: true
-        env:
-          WATCHTOWER_TOKEN: ${{ secrets.WATCHTOWER_HTTP_API_TOKEN }}
-        run: |
-          if [ -z "$WATCHTOWER_TOKEN" ]; then
-            echo "WATCHTOWER_HTTP_API_TOKEN not set — skipping kick. Prod will swap on the next hourly Watchtower poll."
-            echo "To enable near-instant deploys, add this secret (org-level recommended). Value lives in /opt/ansvar/prod/mcp/watchtower/.env on the prod host."
-            exit 0
-          fi
-          echo "Kicking Watchtower /v1/update..."
-          HTTP=$(curl -X POST -sS -o /tmp/watchtower-response \
-            -H "Authorization: Bearer $WATCHTOWER_TOKEN" \
-            -w "%{http_code}" \
-            https://watchtower.ansvar.eu/v1/update) || HTTP="000"
-          echo "Response code: $HTTP"
-          head -c 500 /tmp/watchtower-response 2>/dev/null || true
-          echo
-          if [ "$HTTP" = "200" ]; then
-            echo "OK: Watchtower scan triggered — prod should swap within seconds."
-          else
-            echo "WARN: Watchtower kick returned HTTP $HTTP. Hourly poll will swap eventually."
-          fi
