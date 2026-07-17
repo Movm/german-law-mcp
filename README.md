@@ -77,7 +77,6 @@ POSTGRES_PASSWORD=<langes-zufälliges-passwort>
 QUANTLAW_SNAPSHOT=2026-07-16
 MCP_BEARER_TOKEN=<langes-zufälliges-token>
 ALLOWED_ORIGINS=https://claude.ai,https://chatgpt.com
-MCP_HOSTNAME=german-law-mcp.moritz-waechter.de
 ```
 
 Danach:
@@ -129,8 +128,8 @@ Grünerator und kontrollierte Clients gedacht.
 - Ressource als Docker-Compose-Projekt aus diesem Repository anlegen
   (`/docker-compose.yaml`).
 - Variablen aus `.env.example` in Coolify setzen; Secrets nicht committen.
-- `MCP_HOSTNAME` auf die gewünschte Domain setzen. Die Traefik-Regeln routen
-  ausschließlich diesen Host auf Dienst `mcp`, Port `3000`.
+- Die Traefik-Regeln in `docker-compose.yaml` routen die dort aufgeführten
+  Hosts ausschließlich auf Dienst `mcp`, Port `3000`.
 - Healthcheck: `/health`; MCP-Pfad: `/mcp`.
 - PostgreSQL- und `mcp-data`-Volumes persistent halten.
 - `ingest` und `export` sind als absichtliche Einmal-Jobs mit Coolifys

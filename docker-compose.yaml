@@ -68,10 +68,10 @@ services:
       - traefik.http.middlewares.german-law-mcp-redirect.redirectscheme.scheme=https
       - traefik.http.routers.german-law-mcp-http.entrypoints=http
       - traefik.http.routers.german-law-mcp-http.middlewares=german-law-mcp-redirect
-      - traefik.http.routers.german-law-mcp-http.rule=Host(`${MCP_HOSTNAME:-german-law-mcp.moritz-waechter.de}`)
+      - traefik.http.routers.german-law-mcp-http.rule=Host(`german-law-mcp.moritz-waechter.de`) || Host(`german-law-mcp.159.195.151.89.sslip.io`)
       - traefik.http.routers.german-law-mcp-http.service=german-law-mcp
       - traefik.http.routers.german-law-mcp-https.entrypoints=https
-      - traefik.http.routers.german-law-mcp-https.rule=Host(`${MCP_HOSTNAME:-german-law-mcp.moritz-waechter.de}`)
+      - traefik.http.routers.german-law-mcp-https.rule=Host(`german-law-mcp.moritz-waechter.de`) || Host(`german-law-mcp.159.195.151.89.sslip.io`)
       - traefik.http.routers.german-law-mcp-https.service=german-law-mcp
       - traefik.http.routers.german-law-mcp-https.tls=true
       - traefik.http.routers.german-law-mcp-https.tls.certresolver=letsencrypt
