@@ -56,14 +56,17 @@
   },
   "devDependencies": {
     "@types/node": "^22.13.4",
-    "tsx": "^4.19.2",
-    "typescript": "^5.7.3"
+    "tsx": "^4.23.1",
+    "typescript": "^7.0.2"
   },
   "dependencies": {
-    "@ansvar/mcp-sqlite": "^1.0.3",
-    "@modelcontextprotocol/sdk": "^1.26.0"
+    "@ansvar/mcp-sqlite": "^1.0.5",
+    "@modelcontextprotocol/sdk": "^1.29.0"
   },
   "overrides": {
-    "esbuild": "^0.28.1"
+    "@hono/node-server": "2.0.12",
+    "body-parser": "2.3.0",
+    "esbuild": "^0.28.1",
+    "fast-uri": "3.1.4"
   }
 }
