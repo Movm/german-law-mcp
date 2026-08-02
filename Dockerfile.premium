@@ -6,7 +6,7 @@
 # Run:   docker run -p 3000:3000 ghcr.io/ansvar-systems/german-law-mcp-premium:latest
 
 # --- Stage 1: Build TypeScript ---
-FROM node:20-slim AS builder
+FROM node:26-slim AS builder
 
 WORKDIR /app
 COPY package.json package-lock.json* ./
@@ -16,7 +16,7 @@ COPY src/ src/
 RUN npm run build
 
 # --- Stage 2: Production ---
-FROM node:20-slim AS production
+FROM node:26-slim AS production
 
 RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 
