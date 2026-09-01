@@ -1,6 +1,6 @@
 {
   "name": "@movm/german-law-mcp",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "mcpName": "de.movm/german-law-mcp",
   "description": "Self-hosted German federal-law MCP with transparent QuantLaw provenance",
   "type": "module",
