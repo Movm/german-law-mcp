@@ -1,5 +1,6 @@
 services:
   postgres:
+    profiles: ["data-rebuild"]
     image: postgres:17-alpine
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-germanlaw}
@@ -14,9 +15,7 @@ services:
       retries: 12
 
   ingest:
-    # Coolify-specific: this is an intentional one-shot migration job and must
-    # not make the long-running application appear exited/unhealthy.
-    exclude_from_hc: true
+    profiles: ["data-rebuild"]
     build:
       context: .
       dockerfile: pipeline/Dockerfile
@@ -32,8 +31,7 @@ services:
     restart: "no"
 
   export:
-    # Coolify-specific: the exporter exits successfully after writing SQLite.
-    exclude_from_hc: true
+    profiles: ["data-rebuild"]
     build:
       context: .
       dockerfile: pipeline/Dockerfile
@@ -58,9 +56,6 @@ services:
       # The MCP tools are read-only, but the SQLite runtime needs permission to
       # create transient journal/lock files beside the database.
       - mcp-data:/data
-    depends_on:
-      export:
-        condition: service_completed_successfully
     expose:
       - "3000"
     labels:

@@ -79,13 +79,16 @@ MCP_BEARER_TOKEN=<langes-zufälliges-token>
 ALLOWED_ORIGINS=https://claude.ai,https://chatgpt.com
 ```
 
-Danach:
+Beim ersten Start muss einmalig der Datenbestand gebaut werden:
 
 ```bash
-docker compose up --build
+docker compose --profile data-rebuild up --build export
+docker compose up --build -d mcp
 ```
 
-Der einmalige Import kann je nach Snapshot und Verbindung dauern. Anschließend:
+Der einmalige Import kann je nach Snapshot und Verbindung dauern. Normale
+App-Deployments starten danach nur noch `mcp` und verwenden die bestehende
+SQLite-Datei im persistenten `mcp-data`-Volume. Anschließend:
 
 - Health: `http://localhost:3000/health`
 - MCP: `http://localhost:3000/mcp`
@@ -93,10 +96,12 @@ Der einmalige Import kann je nach Snapshot und Verbindung dauern. Anschließend:
 Neuen Snapshot einspielen:
 
 ```bash
-docker compose run --rm ingest
-docker compose run --rm export
+docker compose --profile data-rebuild up --build export
 docker compose restart mcp
 ```
+
+`data-rebuild` ist absichtlich ein manuell aktiviertes Compose-Profil. Dadurch
+führt ein Code- oder Konfigurations-Deployment keinen Datenimport aus.
 
 ## Zugriffsschutz
 
@@ -132,8 +137,12 @@ Grünerator und kontrollierte Clients gedacht.
   Hosts ausschließlich auf Dienst `mcp`, Port `3000`.
 - Healthcheck: `/health`; MCP-Pfad: `/mcp`.
 - PostgreSQL- und `mcp-data`-Volumes persistent halten.
-- `ingest` und `export` sind als absichtliche Einmal-Jobs mit Coolifys
-  `exclude_from_hc` markiert; nur `postgres` und `mcp` müssen dauerhaft laufen.
+- Normale Coolify-Deployments starten nur `mcp`. `postgres`, `ingest` und
+  `export` gehören zum Profil `data-rebuild` und werden nur für einen bewusst
+  angestoßenen Daten-Rebuild aktiviert.
+- Für den Rebuild in derselben Compose-Ressource ausführen:
+  `docker compose --profile data-rebuild up --build export`. Danach `mcp`
+  neu starten, damit laufende Prozesse die frisch exportierte Datei öffnen.
 
 Das Repository lädt beim ersten Lauf den gewählten QuantLaw-Tag. Ein Tag statt
 `latest` macht Build und Datenstand prüfbar und wiederholbar.
