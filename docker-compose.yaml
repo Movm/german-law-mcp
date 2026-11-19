@@ -63,7 +63,7 @@ services:
       - traefik.http.middlewares.german-law-mcp-redirect.redirectscheme.scheme=https
       - traefik.http.routers.german-law-mcp-http.entrypoints=http
       - traefik.http.routers.german-law-mcp-http.middlewares=german-law-mcp-redirect
-      - traefik.http.routers.german-law-mcp-http.rule=Host(`german-law-mcp.moritz-waechter.de`) || Host(`german-law-mcp.159.195.151.89.sslip.io`)
+      - traefik.http.routers.german-law-mcp-http.rule=Host(`german-law-mcp.moritz-waechter.de`) || Host(`german-law-mcp.159.195.151.89.sslip.io`) || Host(`lqv5ms8i7iyfmzdnm0vl90to.moritz-waechter.de`)
       - traefik.http.routers.german-law-mcp-http.service=german-law-mcp
       # Separate TLS routers keep ACME challenges independent while DNS still
       # points the production hostname at the old server during migration.
@@ -77,6 +77,11 @@ services:
       - traefik.http.routers.german-law-mcp-staging-https.service=german-law-mcp
       - traefik.http.routers.german-law-mcp-staging-https.tls=true
       - traefik.http.routers.german-law-mcp-staging-https.tls.certresolver=letsencrypt
+      - traefik.http.routers.german-law-mcp-coolify-https.entrypoints=https
+      - traefik.http.routers.german-law-mcp-coolify-https.rule=Host(`lqv5ms8i7iyfmzdnm0vl90to.moritz-waechter.de`)
+      - traefik.http.routers.german-law-mcp-coolify-https.service=german-law-mcp
+      - traefik.http.routers.german-law-mcp-coolify-https.tls=true
+      - traefik.http.routers.german-law-mcp-coolify-https.tls.certresolver=letsencrypt
       - traefik.http.services.german-law-mcp.loadbalancer.server.port=3000
     restart: unless-stopped
 
